@@ -14,8 +14,8 @@ Route::middleware(['auth', 'permission:users.create'])
     ->name('users.create');
 
 Route::middleware(['auth', 'permission:users.create'])
-     ->post('/users', [UserController::class, 'store'])
-     ->name('users.store');
+    ->post('/users', [UserController::class, 'store'])
+    ->name('users.store');
 
 // Cập nhật
 Route::middleware(['auth', 'permission:users.update'])
@@ -23,8 +23,8 @@ Route::middleware(['auth', 'permission:users.update'])
     ->name('users.edit');
 
 Route::middleware(['auth', 'permission:users.update'])
-     ->put('/users/{user}', [UserController::class, 'update'])
-     ->name('users.update');
+    ->put('/users/{user}', [UserController::class, 'update'])
+    ->name('users.update');
 
 // Xóa (withTrashed: để báo "đã bị xóa trước đó" thay vì 404)
 Route::middleware(['auth', 'permission:users.delete'])

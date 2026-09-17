@@ -11,6 +11,8 @@ use Spatie\Permission\PermissionRegistrar;
 
 class RolesAndPermissionsSeeder extends Seeder
 {
+    private const STAFF_PASSWORD = 'staff12345';
+
     public function run(): void
     {
         // Reset cached roles and permissions
@@ -57,7 +59,10 @@ class RolesAndPermissionsSeeder extends Seeder
         // seed multiple users and then assign each of them a role, WITHOUT using Factory States
         User::factory()
             ->count(20)
-            ->create(['status' => true])
+            ->create([
+                'status' => true,
+                'password' => Hash::make(self::STAFF_PASSWORD),
+            ])
             ->each(function ($user) {
                 $user->assignRole('staff');
             });

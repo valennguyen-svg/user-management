@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\LoginRequest;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -41,5 +42,27 @@ class AuthController extends Controller
         $request->session()->regenerateToken();
 
         return redirect()->route('login');
+    }
+
+    public function heartbeat(Request $request)
+    {
+
+        $guard = Auth::guard('web');
+        $sessionKey = $guard->getName();
+        $id = $request->session()->get($sessionKey);
+
+        if (! $id) {
+            return response()->json(['state' => 'guest']);
+        }
+
+        $user = User::withTrashed()->find($id);
+
+        return response()->json([
+            'state' => match (true) {
+                $user === null, $user->trashed() => 'deleted',
+                ! $user->status => 'locked',
+                default => 'active',
+            },
+        ]);
     }
 }

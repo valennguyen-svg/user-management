@@ -11,9 +11,7 @@
         <h1 class="h4 mb-0">Danh sách người dùng</h1>
 
         <div class="d-flex gap-2">
-            {{-- Spatie - Blade directives: @can('edit articles') ... @endcan --}}
             @can('users.export')
-                {{-- BR-09: gắn bộ lọc hiện tại vào link export --}}
                 <a href="{{ route('users.export', request()->only(['keyword', 'role', 'status', 'sort'])) }}"
                    class="btn btn-outline-success">Export Excel</a>
             @endcan
@@ -24,7 +22,6 @@
         </div>
     </div>
 
-    {{-- Spatie - Blade directives: @cannot --}}
     @cannot('users.create')
         <p class="text-muted small">Tài khoản của bạn chỉ có quyền xem danh sách.</p>
     @endcannot
@@ -52,15 +49,14 @@
                     </div>
                 </form>
 
-                {{-- UC-07 bước 5: kết quả import --}}
                 @if (session('import_result'))
-                    @php($result = session('import_result'))
+                    @php $result = session('import_result'); @endphp
                     <div class="alert {{ $result['failed'] > 0 ? 'alert-warning' : 'alert-success' }} mt-3 mb-0">
                         Tổng: {{ $result['total'] }} dòng —
                         thành công: {{ $result['success'] }} —
                         thất bại: {{ $result['failed'] }}.
 
-                        @if (! empty($result['errors']))
+                        @if (!empty($result['errors']))
                             <ul class="mb-0 mt-2">
                                 @foreach ($result['errors'] as $error)
                                     <li>Dòng {{ $error['row'] }}: {{ $error['message'] }}</li>
@@ -73,17 +69,20 @@
         </div>
     @endcan
 
-    {{-- FR-04: tìm kiếm, lọc, sắp xếp --}}
+    {{-- Lọc & Tìm kiếm --}}
     <form method="GET" action="{{ route('users.index') }}" class="row g-2 mb-3">
         <div class="col-md-4">
             <input type="text" name="keyword" value="{{ request('keyword') }}"
                    class="form-control" placeholder="Tìm theo tên hoặc email">
         </div>
         <div class="col-md-2">
-            <select name="role" class="form-select">
+            <select name="role" class="form-select text-capitalize">
                 <option value="">Tất cả vai trò</option>
                 @foreach ($roles as $role)
-                    <option value="{{ $role }}" @selected(request('role') === $role)>{{ $role }}</option>
+                    @php $rName = is_object($role) ? $role->name : $role; @endphp
+                    <option value="{{ $rName }}" @selected(request('role') == $rName)>
+                        {{ ucfirst($rName) }}
+                    </option>
                 @endforeach
             </select>
         </div>
@@ -106,22 +105,22 @@
         </div>
     </form>
 
+    {{-- Danh sách Bảng --}}
     <div class="card">
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
                 <thead class="table-light">
-                <tr>
-                    <th>ID</th>
-                    <th>Họ tên</th>
-                    <th>Email</th>
-                    <th>Vai trò</th>
-                    <th>Trạng thái</th>
-                    <th>Ngày tạo</th>
-                    {{-- Spatie - Blade directives: dùng @canany thay cho @hasanypermission --}}
-                    @canany(['users.update', 'users.delete'])
-                        <th class="text-end">Thao tác</th>
-                    @endcanany
-                </tr>
+                    <tr>
+                        <th>ID</th>
+                        <th>Họ tên</th>
+                        <th>Email</th>
+                        <th>Vai trò</th>
+                        <th>Trạng thái</th>
+                        <th>Ngày tạo</th>
+                        @canany(['users.update', 'users.delete'])
+                            <th class="text-end">Thao tác</th>
+                        @endcanany
+                    </tr>
                 </thead>
                 <tbody>
                 @forelse ($users as $user)
@@ -129,8 +128,9 @@
                         <td>{{ $user->id }}</td>
                         <td>{{ $user->name }}</td>
                         <td>{{ $user->email }}</td>
-                        {{-- Spatie - Basic Usage: getRoleNames() --}}
-                        <td>{{ $user->getRoleNames()->implode(', ') }}</td>
+                        <td class="text-capitalize">
+                            {{ $user->getRoleNames()->map(fn($r) => ucfirst($r))->implode(', ') }}
+                        </td>
                         <td>
                             @if ($user->status)
                                 <span class="badge text-bg-success">Hoạt động</span>
@@ -147,11 +147,7 @@
                                        class="btn btn-sm btn-outline-primary">Sửa</a>
                                 @endcan
 
-                                {{-- Spatie - Blade directives:
-                                     @if(auth()->user()->can('edit articles') && $some_other_condition) --}}
-                                {{-- BR-04: không hiện nút Xóa ở chính tài khoản đang đăng nhập --}}
                                 @if (auth()->user()->can('users.delete') && $user->id !== auth()->id())
-                                    {{-- NFR-06: xác nhận trước khi xóa --}}
                                     <form method="POST" action="{{ route('users.destroy', $user) }}"
                                           class="d-inline"
                                           onsubmit="return confirm('Xóa người dùng {{ $user->email }}?')">

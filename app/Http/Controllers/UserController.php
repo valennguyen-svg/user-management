@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Exports\UsersExport;
-use App\Exports\UsersTemplateExport;
 use App\Http\Requests\ImportUserRequest;
 use App\Http\Requests\IndexUserRequest;
 use App\Http\Requests\StoreUserRequest;
@@ -12,9 +11,10 @@ use App\Imports\UsersImport;
 use App\Models\User;
 use App\Services\UserService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
+use Maatwebsite\Excel\Concerns\FromCollection;
+use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Facades\Excel;
 use Spatie\Permission\Models\Role;
 
@@ -22,105 +22,72 @@ class UserController extends Controller
 {
     public function __construct(private UserService $users) {}
 
-    // Các tham số tra cứu dùng chung cho danh sách và Export (BR-09)
+    // Các tham số tra cứu dùng chung cho danh sách và Export
     private const FILTERS = ['keyword', 'role', 'status', 'sort'];
 
     public function index(IndexUserRequest $request)
     {
-        $validated = $request->validated();
+        $this->authorize('viewAny', User::class);
 
-        $users = User::with('roles');
+        $users = $this->users->paginate($request->validated());
 
-        if ($request->filled('role')) {
-            $users = $users->role($request->role);
-        }
-
-        // Tìm theo tên hoặc email
-        if ($request->filled('keyword')) {
-            $keyword = trim($request->keyword);
-            $user = $users->whereAny(['name', 'email'], 'ilike', "%{$keyword}%");
-        }
-
-        // Lọc trạng thái : chỉ nhận '1' hoặc '0'
-        if (in_array($request->status, ['0', '1'], true)) {
-            $users = $users->where('status', $request->status === '1');
-        }
-
-        // Sắp xếp theo ngày tạo
-        $direction = $request->sort === 'desc' ? 'desc' : 'asc';
-        $users = $users->orderBy('created_at', $direction)->orderBy('id', $direction);
-
-        // Docs dùng ->get(), đề yêu cầu phân trang (FR-03) nên đổi thành ->paginate()
-        $users = $users->paginate(10)->withQueryString();
-
-        $roles = Role::all()->pluck('name');
+        $roles = $this->users->roleNames();
 
         return view('users.index', compact('users', 'roles'));
     }
 
     public function create()
     {
-        $roles = Role::all()->pluck('name');
+        $this->authorize('create', User::class);
+
+        $roles = Role::pluck('name');
 
         return view('users.create', compact('roles'));
     }
 
     public function store(StoreUserRequest $request)
     {
-        // : tạo user và gán role trong 1 transaction
-        DB::transaction(function () use ($request) {
-            $user = User::create([
-                'name' => $request->name,
-                'email' => $request->email,
-                'password' => Hash::make($request->password),
-                'status' => $request->boolean('status'),
-            ]);
+        $this->authorize('create', User::class);
 
-            $user->assignRole($request->role);
-        });
+        $this->users->create($request->validated());
 
         return redirect()->route('users.index')->with('success', 'Đã tạo người dùng.');
     }
 
     public function edit(User $user)
     {
-        $roles = Role::all()->pluck('name');
+        $this->authorize('update', $user);
+
+        $roles = Role::pluck('name');
 
         return view('users.edit', compact('user', 'roles'));
     }
 
     public function update(UpdateUserRequest $request, User $user)
     {
-        DB::transaction(function () use ($request, $user) {
-            $user->name = $request->name;
-            $user->email = $request->email;
-            $user->status = $request->boolean('status');
+        $this->authorize('update', $user);
 
-            // Để trống mật khẩu mới thì giữ nguyên mật khẩu cũ (AC-07)
-            if ($request->filled('password')) {
-                $user->password = Hash::make($request->password);
-            }
+        // Đang đăng nhập không được tự chuyển tài khoản sang Không hoạt động
+        if ($user->id === Auth::id() && ! $request->boolean('status')) {
+            return back()->withInput()->with('error', 'Bạn không được tự vô hiệu hóa tài khoản đang đăng nhập.');
+        }
 
-            $user->save();
-
-            $user->syncRoles([$request->role]);
-        });
+        $this->users->update($user, $request->validated());
 
         return redirect()->route('users.index')->with('success', 'Đã cập nhật người dùng.');
     }
 
     public function destroy(User $user)
     {
-        $response = Gate::inspect('delete', $user);
+        $this->authorize('delete', $user);
 
-        if ($response->denied()) {
-            // Policy không ghi lý do (hoặc không tìm thấy Policy) thì vẫn phải có thông báo
-            return redirect()->route('users.index')
-                ->with('error', $response->message() ?? 'Bạn không có quyền xóa người dùng này.');
+        // Không được tự xóa tài khoản của mình
+        if ($user->id === Auth::id()) {
+            return redirect()->route('users.index')->with('error', 'Bạn không thể tự xóa tài khoản đang đăng nhập.');
         }
 
         if (! $this->users->delete($user)) {
-            return redirect()->route('users.index')->with('error', 'Người dùng này đã bị xóa trước đó.');
+            return redirect()->route('users.index')->with('error', 'Người dùng này không tồn tại hoặc đã bị xóa trước đó.');
         }
 
         return redirect()->route('users.index')->with('success', 'Đã xóa người dùng.');
@@ -128,8 +95,8 @@ class UserController extends Controller
 
     public function export(Request $request)
     {
+        $this->authorize('export', User::class);
 
-        // return Excel::download(new UsersExport, 'users.xlsx');
         return Excel::download(
             new UsersExport($request->only(self::FILTERS)),
             'users.xlsx',
@@ -139,19 +106,50 @@ class UserController extends Controller
 
     public function template()
     {
-        return Excel::download(
-            new UsersTemplateExport,
-            'users_import_template.xlsx',
-            \Maatwebsite\Excel\Excel::XLSX
-        );
+        $this->authorize('import', User::class);
+
+        $headings = ['name', 'email', 'password', 'role', 'status'];
+        $sampleData = [
+            [
+                'name' => 'Nguyen Van A',
+                'email' => 'nguyenvana@example.com',
+                'password' => 'Password123!',
+                'role' => 'staff',
+                'status' => 'active',
+            ],
+        ];
+
+        return Excel::download(new class($headings, $sampleData) implements FromCollection, WithHeadings
+        {
+            protected array $headings;
+
+            protected array $data;
+
+            public function __construct(array $headings, array $data)
+            {
+                $this->headings = $headings;
+                $this->data = $data;
+            }
+
+            public function collection(): Collection
+            {
+                return collect($this->data);
+            }
+
+            public function headings(): array
+            {
+                return $this->headings;
+            }
+        }, 'users_import_template.xlsx');
     }
 
     public function import(ImportUserRequest $request)
     {
+        $this->authorize('import', User::class);
+
         $file = $request->file('file');
         $readerType = UsersImport::readerType($file);
 
-        // sai định dạng hoặc thiếu cột thì dừng xử lý
         try {
             $missing = UsersImport::missingColumns($file, $readerType);
         } catch (\Throwable $e) {

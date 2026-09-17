@@ -14,18 +14,23 @@ use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Excel as ExcelType;
 use Maatwebsite\Excel\HeadingRowImport;
 
-// Laravel Excel - Imports:
-// Importing to collections (ToCollection) + Heading row (WithHeadingRow)
-// + Row Validation - Row Validation without ToModel
 class UsersImport implements ToCollection, WithHeadingRow
 {
-    // các cột bắt buộc
-    public const COLUMNS = ['name', 'email', 'password', 'role', 'status'];
+    // Các cột bắt buộc theo spec
+    public const COLUMNS = [
+        'name',
+        'email',
+        'password',
+        'role',
+        'status',
+    ];
 
-    // Giá trị status được công bố trong tệp mẫu
-    public const STATUSES = ['active' => true, 'inactive' => false];
+    // Giá trị status công bố trong tệp mẫu
+    public const STATUSES = [
+        'active' => true,
+        'inactive' => false,
+    ];
 
-    //  ngưỡng số dòng cho một lần import
     public const MAX_ROWS = 1000;
 
     public int $total = 0;
@@ -36,10 +41,6 @@ class UsersImport implements ToCollection, WithHeadingRow
 
     public bool $tooManyRows = false;
 
-    /*
-     * Excel::import(new UsersImport, 'users.xlsx', 's3', \Maatwebsite\Excel\Excel::XLSX);
-     * Chọn reader theo đuôi tệp (xlsx / xls / csv).
-     */
     public static function readerType(UploadedFile $file): string
     {
         return match (strtolower($file->getClientOriginalExtension())) {
@@ -49,10 +50,6 @@ class UsersImport implements ToCollection, WithHeadingRow
         };
     }
 
-    /**
-     * "The headings array contains an array of headings per sheet" -> lấy [0][0] = sheet đầu, hàng tiêu đề.
-     * Trả về danh sách cột còn thiếu (AC-12).
-     */
     public static function missingColumns(UploadedFile $file, string $readerType): array
     {
         $headings = (new HeadingRowImport)->toArray($file, null, $readerType)[0][0] ?? [];
@@ -62,61 +59,78 @@ class UsersImport implements ToCollection, WithHeadingRow
 
     public function collection(Collection $rows): void
     {
-        // Chuẩn hóa dữ liệu, giữ nguyên chỉ số dòng để tính số dòng trong Excel
-        $rows = $rows
-            ->map(fn ($row) => [
+        $processedRows = collect();
+
+        foreach ($rows as $index => $row) {
+            $lineNum = $index + 2; // Dòng 1 là tiêu đề
+
+            $cleanedRow = [
+                'excel_line' => $lineNum,
                 'name' => trim(preg_replace('/\s+/u', ' ', (string) ($row['name'] ?? ''))),
-                'email' => trim((string) ($row['email'] ?? '')),
+                'email' => mb_strtolower(trim((string) ($row['email'] ?? ''))),
                 'password' => (string) ($row['password'] ?? ''),
                 'role' => trim((string) ($row['role'] ?? '')),
                 'status' => mb_strtolower(trim((string) ($row['status'] ?? ''))),
-            ])
-            // Bỏ dòng trống
-            ->filter(fn (array $row) => implode('', $row) !== '');
+            ];
 
-        if ($rows->count() > self::MAX_ROWS) {
+            // Bỏ qua dòng trống hoàn toàn
+            $checkEmpty = array_diff_key($cleanedRow, ['excel_line' => '']);
+            if (implode('', $checkEmpty) !== '') {
+                $processedRows->push($cleanedRow);
+            }
+        }
+
+        if ($processedRows->count() > self::MAX_ROWS) {
             $this->tooManyRows = true;
 
             return;
         }
 
-        $this->total = $rows->count();
+        $this->total = $processedRows->count();
 
-        // Ở đây không gọi ->validate() (sẽ dừng cả tệp), mà lấy lỗi để xử lý từng dòng (BR-10)
-        $validator = Validator::make($rows->toArray(), [
+        // Validate dữ liệu nghiêm ngặt
+        $validator = Validator::make($processedRows->toArray(), [
             '*.name' => ['required', 'string', 'max:255'],
-            // distinct = không trùng trong tệp (docs: chỉ chạy với ToCollection / WithBatchInserts)
             '*.email' => [
-                'required', 'email', 'max:255', 'distinct:ignore_case',
-                Rule::unique('users', 'email')->whereNull('deleted_at'),
+                'required',
+                'string',
+                'max:255',
+                'email:filter', // Rule mặc định kiểm tra email chuẩn
+                'distinct:ignore_case', // Không trùng giữa các dòng trong file
+                Rule::unique('users', 'email')->whereNull('deleted_at'), // Không trùng CSDL
+                function ($attribute, $value, $fail) {
+                    // Yêu cầu email có đuôi domain hợp lệ (dạng user@domain.com, user@domain.vn,...)
+                    if (! preg_match('/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/', $value)) {
+                        $fail('Email không đúng định dạng (phải có dạng user@domain.com).');
+                    }
+                },
             ],
-            '*.password' => ['required', 'string', 'min:8'],
-            '*.role' => ['required', Rule::exists('roles', 'name')],
-            '*.status' => ['required', Rule::in(array_keys(self::STATUSES))],
+            '*.password' => ['required', 'string', 'min:8'], // Bắt buộc, tối thiểu 8 ký tự
+            '*.role' => ['required', Rule::exists('roles', 'name')], // Bắt buộc tồn tại trong CSDL
+            '*.status' => ['required', Rule::in(array_keys(self::STATUSES))], // Chỉ nhận active/inactive
         ], $this->messages());
 
-        // Gom lỗi theo từng dòng: khóa "3.email" -> dòng có chỉ số 3
+        // Gom nhóm lỗi theo dòng trong Excel
         $rowErrors = [];
         foreach ($validator->errors()->messages() as $key => $messages) {
-            $index = (int) explode('.', $key, 2)[0];
-            $rowErrors[$index] = array_merge($rowErrors[$index] ?? [], $messages);
+            $arrayIndex = (int) explode('.', $key, 2)[0];
+            $rowErrors[$arrayIndex] = array_merge($rowErrors[$arrayIndex] ?? [], $messages);
         }
 
-        foreach ($rows as $index => $row) {
-            // Heading row nằm ở dòng 1, dữ liệu bắt đầu từ dòng 2
-            $line = $index + 2;
+        // Thực hiện thêm tài khoản cho các dòng hợp lệ
+        foreach ($processedRows as $arrayIndex => $row) {
+            $line = $row['excel_line'];
 
-            // dòng không hợp lệ thì không tạo tài khoản
-            if (isset($rowErrors[$index])) {
-                $this->addError($line, implode(' ', $rowErrors[$index]));
+            // Nếu thiếu thông tin hoặc sai chuẩn -> Từ chối import dòng này
+            if (isset($rowErrors[$arrayIndex])) {
+                $this->addError($line, implode(' ', $rowErrors[$arrayIndex]));
 
                 continue;
             }
 
-            // Chính sách giao dịch: mỗi dòng hợp lệ được ghi trong 1 transaction riêng.
-            // Lỗi hệ thống ở dòng nào thì chỉ hoàn tác dòng đó.
             try {
                 DB::transaction(function () use ($row) {
+                    // Tạo tài khoản mới hợp lệ
                     $user = User::create([
                         'name' => $row['name'],
                         'email' => $row['email'],
@@ -124,7 +138,6 @@ class UsersImport implements ToCollection, WithHeadingRow
                         'status' => self::STATUSES[$row['status']],
                     ]);
 
-                    // Spatie - Assigning Roles: $user->assignRole('writer');
                     $user->assignRole($row['role']);
                 });
 
@@ -159,7 +172,7 @@ class UsersImport implements ToCollection, WithHeadingRow
             '*.name.required' => 'Họ tên không được để trống.',
             '*.name.max' => 'Họ tên tối đa 255 ký tự.',
             '*.email.required' => 'Email không được để trống.',
-            '*.email.email' => 'Email không đúng định dạng.',
+            '*.email.email' => 'Email phải đầy đủ định dạng dạng user@domain.com.',
             '*.email.max' => 'Email tối đa 255 ký tự.',
             '*.email.distinct' => 'Email bị trùng với dòng khác trong tệp.',
             '*.email.unique' => 'Email đã tồn tại trong hệ thống.',
@@ -168,7 +181,7 @@ class UsersImport implements ToCollection, WithHeadingRow
             '*.role.required' => 'Vai trò không được để trống.',
             '*.role.exists' => 'Vai trò không tồn tại trong hệ thống.',
             '*.status.required' => 'Trạng thái không được để trống.',
-            '*.status.in' => 'Trạng thái chỉ nhận active hoặc inactive.',
+            '*.status.in' => 'Trạng thái chỉ nhận giá trị active hoặc inactive.',
         ];
     }
 }

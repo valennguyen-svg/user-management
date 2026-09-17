@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -24,7 +25,18 @@ class StoreUserRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->whereNull('deleted_at')],
+            'email' => [
+                'required',
+                'string',
+                'max:255',
+                'email:filter',
+                Rule::unique('users', 'email')->whereNull('deleted_at'),
+                function ($attribute, $value, $fail) {
+                    if (! preg_match('/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/', $value)) {
+                        $fail('Trường :attribute không đúng định dạng (phải có dạng user@domain.com).');
+                    }
+                },
+            ],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
             'role' => ['required', 'string', Rule::exists('roles', 'name')],
             'status' => ['required', 'boolean'],
