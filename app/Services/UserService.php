@@ -47,7 +47,7 @@ class UserService
                 'name' => $data['name'],
                 'email' => $data['email'],
                 'password' => Hash::make($data['password']), // BR-02
-                'status' => (bool) $data['status'],
+                'status' => (bool) ($data['status'] ?? false),
             ]);
 
             $this->users->assignRole($user, $data['role']);
