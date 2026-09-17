@@ -7,4 +7,5 @@ Route::get('/', function () {
 });
 
 include __DIR__.'/auth.php';
+include __DIR__.'/export.php';
 include __DIR__.'/import.php';
