@@ -10,12 +10,12 @@ Route::middleware('guest')
     ->name('login');
 
 Route::middleware(['guest', 'throttle:5,1'])
-     ->post('/login', [AuthController::class, 'login'])
-     ->name('login.attempt');
+    ->post('/login', [AuthController::class, 'login'])
+    ->name('login.attempt');
 
 Route::middleware('auth')
-     ->post('/logout', [AuthController::class, 'logout'])
-     ->name('logout');
+    ->post('/logout', [AuthController::class, 'logout'])
+    ->name('logout');
 
 // Đăng ký tài khoản  tài khoản mới ở trạng thái chờ kích hoạt
 Route::middleware('guest')
