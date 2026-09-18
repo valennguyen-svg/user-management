@@ -3,30 +3,18 @@
 namespace App\Policies;
 
 use App\Models\User;
-use Illuminate\Auth\Access\HandlesAuthorization;
+use Illuminate\Auth\Access\Response;
 
 class UserPolicy
 {
-    use HandlesAuthorization;
-
-    public function view(?User $user, User $model): bool
+    public function viewAny(User $user): bool
     {
-        if ($model->published) {
-            return true;
-        }
+        return $user->can('users.view');
+    }
 
-        // visitors cannot view unpublished items
-        if ($user === null) {
-            return false;
-        }
-
-        // admin overrides published status
-        if ($user->can('users.view')) {
-            return true;
-        }
-
-        // authors can view their own unpublished posts
-        return $user->id == $model->user_id;
+    public function view(User $user, User $model): bool
+    {
+        return $user->can('users.view');
     }
 
     public function create(User $user): bool
@@ -34,25 +22,42 @@ class UserPolicy
         return $user->can('users.create');
     }
 
-    public function update(User $user, User $model)
+    public function update(User $user, User $model): Response
     {
-        if ($user->can('users.update')) {
-            return true;
+        if (! $user->can('users.update')) {
+            return Response::deny('Bạn không có quyền cập nhật người dùng.');
         }
 
-        if ($user->can('users.update')) {
-            return $user->id == $model->user_id;
-        }
+        return Response::allow();
     }
 
-    public function delete(User $user, User $model)
+    public function delete(User $user, User $model): Response
     {
-        if ($user->can('users.delete')) {
-            return true;
+        if (! $user->can('users.delete')) {
+            return Response::deny('Bạn không có quyền xóa người dùng.');
         }
 
-        if ($user->can('users.delete')) {
-            return $user->id == $model->user_id;
+        //  không được tự xóa tài khoản đang đăng nhập
+        if ($user->id === $model->id) {
+            return Response::deny('Bạn không thể tự xóa tài khoản của mình.');
         }
+
+        return Response::allow();
+    }
+
+    public function export(User $user): bool
+    {
+        return $user->can('users.export');
+    }
+
+    public function import(User $user): bool
+    {
+        return $user->can('users.import');
+    }
+
+    /** Chỉ dùng nếu đã làm tính năng khôi phục người dùng đã xóa. */
+    public function restore(User $user, User $model): bool
+    {
+        return $user->can('users.delete');
     }
 }

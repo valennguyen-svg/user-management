@@ -7,9 +7,7 @@ use App\Services\UserService;
 
 class RegisterController extends Controller
 {
-    public function __construct(private UserService $userService)
-    {
-    }
+    public function __construct(private UserService $userService) {}
 
     public function show()
     {
@@ -18,7 +16,11 @@ class RegisterController extends Controller
 
     public function store(RegisterRequest $request)
     {
-        $this->userService->register($request->validated());
+        $data = $request->validated();
+        $data['role'] = 'staff';
+        $data['status'] = false;
+
+        $this->userService->create($data);
 
         return redirect()->route('login')
             ->with('success', 'Đăng ký thành công.');

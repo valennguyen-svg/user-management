@@ -1,9 +1,9 @@
 @extends('layouts.app')
 
-@section('title', 'Tạo người dùng')
+@section('title', 'Tạo người dùng mới')
 
 @section('content')
-    <h1 class="h4 mb-3">Tạo người dùng</h1>
+    <h1 class="h4 mb-3">Tạo người dùng mới</h1>
 
     <div class="card">
         <div class="card-body">
@@ -12,8 +12,8 @@
 
                 @include('users.form')
 
-                <div class="d-flex gap-2">
-                    <button type="submit" class="btn btn-primary">Lưu</button>
+                <div class="d-flex gap-2 mt-3">
+                    <button type="submit" class="btn btn-primary">Tạo mới</button>
                     <a href="{{ route('users.index') }}" class="btn btn-outline-secondary">Quay lại</a>
                 </div>
             </form>

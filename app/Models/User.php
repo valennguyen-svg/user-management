@@ -27,6 +27,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'status',
     ];
 
     /**
@@ -37,6 +38,7 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+
     ];
 
     /**
@@ -49,6 +51,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'status' => 'boolean',
         ];
     }
 
@@ -60,10 +63,10 @@ class User extends Authenticatable
         if (! empty($filters['keyword'])) {
             $keyword = trim($filters['keyword']);
 
-            $query->where(function (Builder $q) use ($keyword) {
-                $q->where('name', 'ilike', "%{$keyword}%")
-                    ->orWhere('email', 'ilike', "%{$keyword}%");
-            });
+            $query->whereAny([
+                'name',
+                'email',
+            ], 'ilike', "%{keyword}%");
         }
 
         // Returns only users with the role 'writer'
@@ -75,6 +78,7 @@ class User extends Authenticatable
                 $query->whereRaw('1 = 0');
             }
         }
+        return $query;
 
         // Lọc trạng thái: 1 = Hoạt động, 0 = Không hoạt động
         if (isset($filters['status']) && in_array($filters['status'], ['0', '1'], true)) {

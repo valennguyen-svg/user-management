@@ -13,7 +13,7 @@
 
                 @include('users.form', ['user' => $user])
 
-                <div class="d-flex gap-2">
+                <div class="d-flex gap-2 mt-3">
                     <button type="submit" class="btn btn-primary">Cập nhật</button>
                     <a href="{{ route('users.index') }}" class="btn btn-outline-secondary">Quay lại</a>
                 </div>
