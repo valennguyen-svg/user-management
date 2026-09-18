@@ -105,9 +105,19 @@ class UsersImport implements ToCollection, WithHeadingRow
                     }
                 },
             ],
-            '*.password' => ['required', 'string', 'min:8'], // Bắt buộc, tối thiểu 8 ký tự
-            '*.role' => ['required', Rule::exists('roles', 'name')], // Bắt buộc tồn tại trong CSDL
-            '*.status' => ['required', Rule::in(array_keys(self::STATUSES))], // Chỉ nhận active/inactive
+            '*.password' => [
+                'required',
+                'string',
+                'min:8',
+            ], // Bắt buộc, tối thiểu 8 ký tự
+            '*.role' => [
+                'required',
+                Rule::exists('roles', 'name'),
+            ], // Bắt buộc tồn tại trong CSDL
+            '*.status' => [
+                'required',
+                Rule::in(array_keys(self::STATUSES)),
+            ], // Chỉ nhận active/inactive
         ], $this->messages());
 
         // Gom nhóm lỗi theo dòng trong Excel

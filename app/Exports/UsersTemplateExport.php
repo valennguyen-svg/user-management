@@ -12,8 +12,20 @@ class UsersTemplateExport implements FromArray, ShouldAutoSize, WithHeadings
     public function array(): array
     {
         return [
-            ['Nguyễn Văn A', 'nguyenvana@example.com', 'password123', 'staff', 'active'],
-            ['Trần Thị B', 'tranthib@example.com', 'password123', 'staff', 'inactive'],
+            [
+                'Nguyễn Văn A',
+                'nguyenvana@example.com',
+                'password123',
+                'staff',
+                'active',
+            ],
+            [
+                'Trần Thị B',
+                'tranthib@example.com',
+                'password123',
+                'staff',
+                'inactive',
+            ],
 
         ];
     }

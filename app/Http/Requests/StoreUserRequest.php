@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests;
 
-use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -37,9 +36,21 @@ class StoreUserRequest extends FormRequest
                     }
                 },
             ],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
-            'role' => ['required', 'string', Rule::exists('roles', 'name')],
-            'status' => ['required', 'boolean'],
+            'password' => [
+                'required',
+                'string',
+                'min:8',
+                'confirmed',
+            ],
+            'role' => [
+                'required',
+                'string',
+                Rule::exists('roles', 'name'),
+            ],
+            'status' => [
+                'required',
+                'boolean',
+            ],
         ];
     }
 

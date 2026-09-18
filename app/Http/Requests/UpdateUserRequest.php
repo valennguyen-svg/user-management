@@ -20,7 +20,11 @@ class UpdateUserRequest extends FormRequest
         $userId = is_object($user) ? $user->id : $user;
 
         return [
-            'name' => ['required', 'string', 'max:255'],
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+            ],
             // Bỏ qua chính user đang sửa khi kiểm tra trùng email
             'email' => [
                 'required',
@@ -35,9 +39,21 @@ class UpdateUserRequest extends FormRequest
                 },
             ],
             // Để trống thì giữ mật khẩu cũ
-            'password' => ['nullable', 'string', 'min:8', 'confirmed'],
-            'role' => ['required', 'string', Rule::exists('roles', 'name')],
-            'status' => ['required', 'boolean'],
+            'password' => [
+                'nullable',
+                'string',
+                'min:8',
+                'confirmed',
+            ],
+            'role' => [
+                'required',
+                'string',
+                Rule::exists('roles', 'name'),
+            ],
+            'status' => [
+                'required',
+                'boolean',
+            ],
         ];
     }
 

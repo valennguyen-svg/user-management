@@ -23,7 +23,7 @@ class UserService
         return $this->users->paginate($filters, $perPage);
     }
 
-    // Truy vấn cho Export, áp dụng cùng bộ lọc với danh sách (BR-09)
+    // Truy vấn cho Export, áp dụng cùng bộ lọc với danh sách 
     public function exportQuery(array $filters): Builder
     {
         return $this->users->filteredQuery($filters);
@@ -34,7 +34,7 @@ class UserService
         return $this->roles->names();
     }
 
-    // Tạo người dùng và gán vai trò trong Transaction (UC-03)
+    // Tạo người dùng và gán vai trò trong Transaction 
     public function create(array $data): User
     {
         return DB::transaction(function () use ($data) {
@@ -51,7 +51,7 @@ class UserService
         });
     }
 
-    // Cập nhật người dùng và đồng bộ vai trò (UC-04)
+    // Cập nhật người dùng và đồng bộ vai trò 
     public function update(User $user, array $data): User
     {
         return DB::transaction(function () use ($user, $data) {
@@ -61,7 +61,7 @@ class UserService
                 'status' => (bool) ($data['status'] ?? false),
             ];
 
-            // Nếu để trống mật khẩu mới thì giữ nguyên mật khẩu cũ (AC-07)
+            // Nếu để trống mật khẩu mới thì giữ nguyên mật khẩu cũ
             if (! empty($data['password'])) {
                 $attributes['password'] = Hash::make($data['password']);
             }
@@ -73,7 +73,6 @@ class UserService
         });
     }
 
-    // Xóa mềm người dùng (UC-05 / BR-07)
     public function delete(User $user): bool
     {
         if ($user->trashed()) {

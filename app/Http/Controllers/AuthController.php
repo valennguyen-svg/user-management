@@ -48,7 +48,7 @@ class AuthController extends Controller
     {
 
         $guard = Auth::guard('web');
-        $sessionKey = $guard->getName();
+        $sessionKey = Auth::getName(); // hoặc dùng 'login_web_59ba36addc2b2f9401580f014c7f58ea4e30989d'
         $id = $request->session()->get($sessionKey);
 
         if (! $id) {

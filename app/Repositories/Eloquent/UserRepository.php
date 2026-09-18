@@ -21,10 +21,10 @@ class UserRepository implements UserRepositoryInterface
         if (! empty($filters['keyword'])) {
             $keyword = trim($filters['keyword']);
 
-            $query->where(function (Builder $q) use ($keyword) {
-                $q->where('name', 'ilike', "%{$keyword}%")
-                    ->orWhere('email', 'ilike', "%{$keyword}%");
-            });
+            $query->whereAny([
+                'name',
+                'email',
+            ], 'ilike', "%{$keyword}%");
         }
 
         if (! empty($filters['role'])) {
@@ -35,6 +35,7 @@ class UserRepository implements UserRepositoryInterface
                 $query->whereRaw('1 = 0');
             }
         }
+        return $query;
 
         // Lọc trạng thái
         if (isset($filters['status']) && in_array($filters['status'], ['0', '1'], true)) {

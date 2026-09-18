@@ -3,7 +3,6 @@
 namespace App\Http\Middleware;
 
 use Closure;
-use Illuminate\Auth\SessionGuard;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
@@ -13,7 +12,7 @@ class EnsureUserIsActive
     public function handle(Request $request, Closure $next): Response
     {
         $guard = Auth::guard('web');
-        $id = $request->session()->get($guard->getName());
+        $id = $request->session()->get(Auth::getName());
 
         // Phiên có ID nhưng không lấy được người dùng => tài khoản đã bị xóa mềm.
         // Trường hợp còn lại: lấy được người dùng nhưng đang bị khóa.

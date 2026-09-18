@@ -108,7 +108,13 @@ class UserController extends Controller
     {
         $this->authorize('import', User::class);
 
-        $headings = ['name', 'email', 'password', 'role', 'status'];
+        $headings = [
+            'name',
+            'email',
+            'password',
+            'role',
+            'status',
+        ];
         $sampleData = [
             [
                 'name' => 'Nguyen Van A',
